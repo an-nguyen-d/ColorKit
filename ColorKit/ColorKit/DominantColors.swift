@@ -100,17 +100,19 @@ extension UIImage {
     ///   - quality: The quality used to determine the dominant colors. A higher quality will yield more accurate results, but will be slower.
     ///   - algorithm: The algorithm used to determine the dominant colors. When using a k-means algorithm (`kMeansClustering`), a `CIKMeans` CIFilter isused. Unfortunately this filter doesn't work on the simulator.
     /// - Returns: The dominant colors as array of `UIColor` instances. When using the `.iterative` algorithm, this array is ordered where the first color is the most dominant one.
-    public func dominantColors(with quality: DominantColorQuality = .fair, algorithm: DominantColorAlgorithm = .iterative) throws -> [UIColor] {
+  public func dominantColors(with quality: DominantColorQuality = .fair, algorithm: DominantColorAlgorithm = .iterative, colorCount: Int) throws -> [UIColor] {
         switch algorithm {
         case .iterative:
-            let dominantColorFrequencies = try self.dominantColorFrequencies(with: quality)
-            let dominantColors = dominantColorFrequencies.map { (colorFrequency) -> UIColor in
+          let dominantColorFrequencies = try self.dominantColorFrequencies(with: quality, dominantColorsMaxCount: colorCount)
+            let dominantColors = dominantColorFrequencies
+            .map { (colorFrequency) -> UIColor in
                 return colorFrequency.color
             }
-            
+
             return dominantColors
+
         case .kMeansClustering:
-            let dominantcolors = try kMeansClustering(with: quality)
+          let dominantcolors = try kMeansClustering(with: quality, colorCount: colorCount)
             return dominantcolors
         }
     }
@@ -121,8 +123,8 @@ extension UIImage {
     /// - Parameters:
     ///   - quality: The quality used to determine the dominant colors. A higher quality will yield more accurate results, but will be slower.
     /// - Returns: The dominant colors as an ordered array of `ColorFrequency` instances, where the first element is the most common one. The frequency is represented as a percentage ranging from 0 to 1.
-    public func dominantColorFrequencies(with quality: DominantColorQuality = .fair) throws -> [ColorFrequency] {
-        
+  public func dominantColorFrequencies(with quality: DominantColorQuality = .fair, dominantColorsMaxCount: Int) throws -> [ColorFrequency] {
+
         // ------
         // Step 1: Resize the image based on the requested quality
         // ------
@@ -230,7 +232,7 @@ extension UIImage {
         // ------
         
         // We only keep the first few dominant colors.
-        let dominantColorsMaxCount = 8
+//        let dominantColorsMaxCount = 8
         dominantColors = Array(dominantColors.prefix(dominantColorsMaxCount))
         
         // ------
@@ -259,13 +261,13 @@ extension UIImage {
         return dominantColors
     }
     
-    private func kMeansClustering(with quality: DominantColorQuality) throws -> [UIColor] {
+  private func kMeansClustering(with quality: DominantColorQuality, colorCount: Int) throws -> [UIColor] {
         guard let ciImage = CIImage(image: self) else {
             throw ImageColorError.ciImageFailure
         }
         let kMeansFilter = CIFilter(name: "CIKMeans")!
         
-        let clusterCount = 8
+        let clusterCount = colorCount
 
         kMeansFilter.setValue(ciImage, forKey: kCIInputImageKey)
         kMeansFilter.setValue(CIVector(cgRect: ciImage.extent), forKey: "inputExtent")
